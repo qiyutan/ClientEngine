@@ -11,25 +11,18 @@
 @protocol CEHttpRequestDelegate;
 @class CEHttpResponse;
 
-typedef enum {
-    CEHttpRequestPriorityHigh = NSOperationQueuePriorityHigh,
-    CEHttpRequestPriorityNormal = NSOperationQueuePriorityNormal,
-    CEHttpRequestPriorityLow = NSOperationQueuePriorityLow
-}CEHttpRequestPriority;
-
 typedef void (^CEHttpRequestCompletionBlock)(CEHttpResponse *response);
 
 @interface CEHttpRequest : NSObject
 
 @property(nonatomic, assign) BOOL cookieRequired;
 @property(nonatomic, assign) NSTimeInterval timoutInterval;
-@property(nonatomic, assign) CEHttpRequestPriority priority;
 @property(nonatomic, copy) CEHttpRequestCompletionBlock compeletionBlock;
-
-+ (void)setSessionCookies:(NSMutableArray*)newSessionCookies;
-+ (NSArray*)sessionCookies;
-+ (void)addSessionCookie:(NSHTTPCookie *)newCookie;
-+ (void)setMaxConcurrentRequestCount:(NSInteger)count;
+@property(nonatomic, readonly) NSDictionary *requestHeaders;
+@property(nonatomic, readonly) NSURL *url;
+@property(nonatomic, readonly) NSData *postData;
+@property(nonatomic, retain) NSArray *sessionCookies;
+@property(nonatomic, retain) NSString *method;
 
 - (id)initWithURL:(NSURL*)url;
 
@@ -38,6 +31,7 @@ typedef void (^CEHttpRequestCompletionBlock)(CEHttpResponse *response);
 
 - (void)startSynchronous;
 - (void)startAsynchronous;
+- (void)startAsynchronousInQueue:(NSOperationQueue*)queue priority:(NSOperationQueuePriority)priority;
 - (void)cancel;
 
 @end

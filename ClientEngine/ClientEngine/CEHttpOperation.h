@@ -12,11 +12,7 @@
 @protocol CEHttpOperationDelegate;
 
 @interface CEHttpOperation : NSOperation
-+ (void)setMaxConcurrentOperationCount:(NSInteger)count;
-+ (void)executeOperationWithURLRequest:(NSURLRequest*)request;
-+ (void)executeOperationWithURLRequest:(NSURLRequest*)request delegate:(id<CEHttpOperationDelegate>)delegate;
-+ (void)executeOperationWithURLRequest:(NSURLRequest*)request priority:(NSOperationQueuePriority)priority delegate:(id<CEHttpOperationDelegate>)delegate;
-+ (void)cancelOperationWithURLRequest:(NSURLRequest*)request;
+- (id)initWithURLReuqest:(NSURLRequest*)request delegate:(id<CEHttpOperationDelegate>)delegate;
 @end
 
 @protocol CEHttpOperationDelegate <NSObject>

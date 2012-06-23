@@ -36,7 +36,7 @@
     STAssertTrue(WaitForRunloop(^{return _requests.count == 0;}), @"Error");
 }
 
-- (void)testPriority
+- (void)ytestPriority
 {
     NSURLRequest *request1 = [[NSURLRequest alloc] initWithURL:[NSURL URLWithString:@"http://www.sina.com"]];
     [CEHttpOperation executeOperationWithURLRequest:request1 priority:NSOperationQueuePriorityVeryLow delegate:self];

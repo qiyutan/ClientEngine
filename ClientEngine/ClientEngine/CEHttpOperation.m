@@ -8,7 +8,6 @@
 
 #import "CEHttpOperation.h"
 
-static NSOperationQueue *s_operationQueue = nil;
 
 @interface CEHttpOperation()<NSURLConnectionDataDelegate>
 {
@@ -16,7 +15,9 @@ static NSOperationQueue *s_operationQueue = nil;
     id<CEHttpOperationDelegate> _delegate;
     BOOL _isFinished;
     BOOL _isExecuting;
-    NSURLConnection *_connection;
+    NSThread *_delegateThread;
+    NSData *_responseData;
+    NSError *_error;
 }
 @property(nonatomic, readonly) NSURLRequest *request;
 - (id)initWithURLReuqest:(NSURLRequest*)request delegate:(id<CEHttpOperationDelegate>)delegate;
@@ -25,41 +26,6 @@ static NSOperationQueue *s_operationQueue = nil;
 @implementation CEHttpOperation
 @synthesize request = _request;
 
-+ (void)initialize
-{
-    s_operationQueue = [[NSOperationQueue alloc] init];
-}
-
-+ (void)setMaxConcurrentOperationCount:(NSInteger)count
-{
-    s_operationQueue.maxConcurrentOperationCount = count;
-}
-
-+ (void)executeOperationWithURLRequest:(NSURLRequest*)request
-{
-    [[self class] executeOperationWithURLRequest:request priority:NSOperationQueuePriorityNormal delegate:nil];
-}
-
-+ (void)executeOperationWithURLRequest:(NSURLRequest*)request delegate:(id<CEHttpOperationDelegate>)delegate
-{
-    [[self class] executeOperationWithURLRequest:request priority:NSOperationQueuePriorityNormal delegate:delegate];
-}
-
-+ (void)executeOperationWithURLRequest:(NSURLRequest *)request priority:(NSOperationQueuePriority)priority delegate:(id<CEHttpOperationDelegate>)delegate
-{
-    CEHttpOperation *operaton = [[CEHttpOperation alloc] initWithURLReuqest:request delegate:delegate];
-    operaton.queuePriority = priority;
-    [s_operationQueue addOperation:operaton];
-}
-
-+ (void)cancelOperationWithURLRequest:(NSURLRequest *)request
-{
-    for(CEHttpOperation *operaton in s_operationQueue.operations){
-        if(operaton.request == request){
-            [operaton cancel];
-        }
-    }
-}
 
 - (id)init
 {
@@ -73,6 +39,9 @@ static NSOperationQueue *s_operationQueue = nil;
     if(self){
         _request = request;
         _delegate = delegate;
+        if(_delegate){
+            _delegateThread = [NSThread currentThread];
+        }
     }
     return self;
 }
@@ -81,9 +50,15 @@ static NSOperationQueue *s_operationQueue = nil;
 {
     NSURLResponse *response;
     NSError *error;
-     NSLog(@"execute %@", _request);
-    NSData *data = [NSURLConnection sendSynchronousRequest:_request returningResponse:&response error:&error];
-    [_delegate httpOperationDidFinishURLRequest:_request responseData:data error:error];
+    NSLog(@"execute %@", _request);
+    _responseData = [NSURLConnection sendSynchronousRequest:_request returningResponse:&response error:&error];
+    _error = error;
+    if(_delegate && [_delegateThread isExecuting]){
+        [self performSelector:@selector(callback:) 
+                     onThread:_delegateThread
+                   withObject:nil
+                waitUntilDone:NO];
+    }
     NSLog(@"finish %@", _request);
     
     [self willChangeValueForKey:@"isFinished"];
@@ -135,6 +110,14 @@ static NSOperationQueue *s_operationQueue = nil;
 {
     [super cancel];
     [NSURLConnection canHandleRequest:_request];
+}
+         
+#pragma mark - callback
+- (void)callback:(NSArray*)arguments
+{
+    [_delegate httpOperationDidFinishURLRequest:_request
+                                   responseData:_responseData
+                                          error:_error];
 }
 
 

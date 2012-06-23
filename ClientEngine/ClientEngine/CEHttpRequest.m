@@ -10,8 +10,7 @@
 #import "CEHttpOperation.h"
 #import "CEHttpResponse.h"
 
-static NSMutableArray *s_sessionCookies = nil;
-static NSInteger s_maxConcurrentRequestCount = 4;
+static NSOperationQueue *s_defaultOperationQueue = nil;
 
 @interface CEHttpRequest ()<CEHttpOperationDelegate>
 {
@@ -21,6 +20,7 @@ static NSInteger s_maxConcurrentRequestCount = 4;
     NSMutableURLRequest *_urlRequest;
     NSError *_error;
     BOOL _sync;
+    CEHttpOperation *_operation;
 }
 
 - (void)buildRequest;
@@ -33,42 +33,25 @@ static NSInteger s_maxConcurrentRequestCount = 4;
 @implementation CEHttpRequest
 
 @synthesize cookieRequired = _cookieRequired;
-@synthesize priority = _priority;
 @synthesize timoutInterval = _timoutInterval;
 @synthesize compeletionBlock = _compeletionBlock;
+@synthesize sessionCookies = _sessionCookies;
+@synthesize requestHeaders = _requestHeaders;
+@synthesize url = _url;
+@synthesize postData = _postData;
+@synthesize method = _method;
 
-+ (void)setSessionCookies:(NSMutableArray*)newSessionCookies
++ (void)initialize
 {
-    s_sessionCookies = newSessionCookies;
-}
-
-+ (NSArray*)sessionCookies
-{
-    return s_sessionCookies;
-}
-
-+ (void)addSessionCookie:(NSHTTPCookie *)newCookie
-{
-    for(NSInteger i = 0; i < s_sessionCookies.count; i++){
-        NSHTTPCookie *cookie = [s_sessionCookies objectAtIndex:i];
-        if([cookie.name isEqualToString:newCookie.name]){
-            [s_sessionCookies replaceObjectAtIndex:i withObject:newCookie];
-            break;
-        }
-    }
-}
-
-+ (void)setMaxConcurrentRequestCount:(NSInteger)count
-{
-    s_maxConcurrentRequestCount = count;
+    s_defaultOperationQueue = [[NSOperationQueue alloc] init];
 }
 
 - (id)initWithURL:(NSURL *)url
 {
-    _priority = CEHttpRequestPriorityNormal;
     self = [super init];
     if (self) {
         _url = url;
+        _method = @"Get";
     }
     return self;
 }
@@ -101,9 +84,21 @@ static NSInteger s_maxConcurrentRequestCount = 4;
 
 - (void)startAsynchronous
 {
+    [self startAsynchronousInQueue:nil priority:NSOperationQueuePriorityNormal];
+}
+
+- (void)startAsynchronousInQueue:(NSOperationQueue*)queue priority:(NSOperationQueuePriority)priority
+{
     _sync = NO;
     [self buildRequest];
-    [CEHttpOperation executeOperationWithURLRequest:_urlRequest priority:_priority delegate:self];
+    _operation = [[CEHttpOperation alloc] initWithURLReuqest:_urlRequest delegate:self];
+    _operation.queuePriority = priority;
+    if(queue){
+        [queue addOperation:_operation];
+    }
+    else {
+        [s_defaultOperationQueue addOperation:_operation];
+    }
 }
 
 - (void)cancel
@@ -112,7 +107,7 @@ static NSInteger s_maxConcurrentRequestCount = 4;
         [NSURLConnection canHandleRequest:_urlRequest];
     }
     else {
-        [CEHttpOperation cancelOperationWithURLRequest:_urlRequest];
+        [_operation cancel];
     }
 }
      
@@ -132,7 +127,7 @@ static NSInteger s_maxConcurrentRequestCount = 4;
     else {
         _urlRequest = [NSMutableURLRequest requestWithURL:_url];
     }
-    
+    _urlRequest.HTTPMethod = _method;
     [self buildRequestHeaders];
     [self buildPostBody];
 }
@@ -152,7 +147,7 @@ static NSInteger s_maxConcurrentRequestCount = 4;
 - (void)buildSessionCookies
 {
     if(_cookieRequired){
-        NSDictionary *cookieHeaders = [NSHTTPCookie requestHeaderFieldsWithCookies:s_sessionCookies];
+        NSDictionary *cookieHeaders = [NSHTTPCookie requestHeaderFieldsWithCookies:_sessionCookies];
         [cookieHeaders enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
             [_urlRequest addValue:obj forHTTPHeaderField:key];
         }];
